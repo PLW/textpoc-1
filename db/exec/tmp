@@ -1,0 +1,85 @@
+void TextProximityStage::collectResults() {
+
+    uint64_t recId = 0;
+    uint32_t nterms = _params.query.getTermsForBounds().size();
+
+    std::vector<const TextRecordData*> runv;    // run of records for common RecordId.
+    std::vector<uint64_t>* termv;               // query term hashes in given order.
+    std::vector<uint32_t>* termperm;            // permutation of terms in matching window.
+
+    if (tp_debug)
+        std::cout << "_reorderBound = " << _reorderBound << std::endl;
+
+    if (_reorderBound >= 0) {
+        // set up permutation testing.
+        termperm = new std::vector<uint32_t>(nterms);
+        termv = new std::vector<uint64_t>(nterms);
+        std::vector<std::string>::const_iterator it;
+        for (it = _params.query.getTermv().begin(); it != _params.query.getTermv().end(); ++it) {
+            if (tp_debug)
+                std::cout << "termv->push_back(_hash(" << *it << "));" << std::endl;
+            termv->push_back(_hash(*it));
+        }
+    }
+
+    // sort the entire working set and process runs of common RecordIds
+    std::sort(_posv.begin(), _posv.end(), proximitySort);
+    std::vector<TextRecordData>::const_iterator it2 = _posv.begin();
+
+    for (; it2 != _posv.end(); ++it2) {
+        if (it2->recId != recId) {
+            // we have a run of common recordIds stored in runv.
+            termperm->clear();
+            if (tp_debug)
+                std::cout << "runv.size() = " << runv.size() << std::endl;
+
+            std::vector<const TextRecordData*>::const_iterator it3;
+            for (it3 = runv.begin(); it3 != runv.end(); ++it3) {
+                // scan for all terms within _proximityWindow.
+
+                std::set<std::string> terms;    // for counting unique matching terms.
+                uint32_t width = 0;             // current width of match window.
+                uint32_t pos = (*it3)->pos;     // current term position.
+                uint32_t depth = 0;
+
+                std::vector<const TextRecordData*>::const_iterator it4;
+                for (it4 = it3; it4 != runv.end() && width < _proximityWindow; ++it4, ++depth) {
+
+                    const std::string& term = (*it4)->term;
+                    uint32_t termPos = (*it4)->pos;
+
+                    if (tp_debug) {
+                        for (uint32_t z = 0; z<depth; ++z) std::cout << ' ';
+                        std::cout << "(id, term, pos) = (" << recId << ", "
+                                  << term << ", " << termPos << ")" << std::endl;
+                    }
+
+                    width += (termPos - pos);
+                    pos = termPos;
+                    terms.insert(term);
+
+                    if (_reorderBound >= 0) {
+                        int i = _indexOf(*termv, _hash(term));
+                        if (-1==i) {
+                            if (tp_debug)
+                                std::cout << "Uh-oh, internal inconsistentcy: index term hash"
+                                         " does not match any query term hash!" << std:: endl;
+                            break;
+                        }
+                        termperm->push_back((uint32_t)i);
+                    }
+
+                    if (terms.size() == nterms && width < _proximityWindow) {
+                        if (-1 == _reorderBound || _checkPermutation(*termperm, _reorderBound))
+                            _resultSet.push_back((*it4)->wsid);
+                        break;
+                    }
+                }
+            }
+            recId = it2->recId;
+            runv.clear();
+        }
+        runv.push_back(&(*it2));
+    }
+}
+
