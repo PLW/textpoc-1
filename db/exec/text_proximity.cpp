@@ -493,21 +493,15 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         // We rejected this document for not matching the filter.
         invariant(WorkingSet::INVALID_ID == textRecordData->wsid);
         _ws->free(wsid);
-        if (tp_debug)
-            std::cout << "addTerm:001" << std::endl;
         return NEED_TIME;
     }
 
     if (WorkingSet::INVALID_ID == textRecordData->wsid) {
-        if (tp_debug)
-            std::cout << "addTerm:002" << std::endl;
 
         // We haven't seen this RecordId before.
         bool shouldKeep = true;
 
         if (_filter) {
-            if (tp_debug)
-                std::cout << "addTerm:003" << std::endl;
 
             // We have not seen this document before and need to apply a filter.
             bool wasDeleted = false;
@@ -525,8 +519,6 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
                 wsm->makeObjOwnedIfNeeded();
                 _idRetrying = wsid;
                 *out = WorkingSet::INVALID_ID;
-                if (tp_debug)
-                    std::cout << "addTerm:004" << std::endl;
                 return NEED_YIELD;
             } catch (const TextMatchableDocument::DocumentDeletedException&) {
                 // We attempted to fetch the document but decided it should be excluded from the
@@ -541,8 +533,6 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         }
 
         if (shouldKeep && !wsm->hasObj()) {
-            if (tp_debug)
-                std::cout << "addTerm:005" << std::endl;
 
             // Our parent expects RID_AND_OBJ members: fetch the document if we haven't already.
             try {
@@ -552,8 +542,6 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
                 wsm->makeObjOwnedIfNeeded();
                 _idRetrying = wsid;
                 *out = WorkingSet::INVALID_ID;
-                if (tp_debug)
-                    std::cout << "addTerm:006" << std::endl;
                 return NEED_YIELD;
             }
         }
@@ -561,8 +549,6 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         if (!shouldKeep) {
             _ws->free(wsid);
             textRecordData->rejected = true;
-            if (tp_debug)
-                std::cout << "addTerm:007" << std::endl;
             return NEED_TIME;
         }
 
